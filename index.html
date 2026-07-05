@@ -6,7 +6,6 @@
 <title>CTS — Visual Agency · Product Design</title>
 <meta name="description" content="CTS visual agency has moved. Visit our new website at coastteamstudio.com — 3D visualization, AI imagery and product design.">
 <link rel="canonical" href="https://coastteamstudio.com/">
-<link rel="preload" as="image" href="bg-2560.webp" media="(min-width: 701px)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
@@ -14,6 +13,8 @@
   :root{
     --green-deep:#46695c;
     --green-soft:#7ba392;
+    --mint-1:#e8f3ec;
+    --mint-2:#cfe4d6;
     --white:#ffffff;
     --shadow:0 10px 30px rgba(70,105,92,.28);
   }
@@ -22,7 +23,8 @@
   body{
     font-family:'Poppins',system-ui,sans-serif;
     color:var(--white);
-    background:#dcebe2;
+    background:linear-gradient(135deg,var(--mint-1),var(--mint-2));
+    overflow:hidden;
   }
   .stage{
     position:relative;
@@ -72,7 +74,6 @@
     top:76%;
     transform:translate(-50%,-50%);
     text-align:center;
-    animation:rise .8s ease-out .15s both;
   }
   .cta-label{
     display:block;
@@ -98,23 +99,48 @@
   }
   .cta:hover{transform:translateY(-3px);box-shadow:0 16px 38px rgba(70,105,92,.36)}
   .cta:focus-visible{outline:3px solid var(--green-deep);outline-offset:4px}
-  @keyframes rise{
-    from{opacity:0;transform:translate(-50%,calc(-50% + 14px))}
-    to{opacity:1;transform:translate(-50%,-50%)}
+
+  /* ---- intro state ---- */
+  body.intro .stage picture,
+  body.intro .corner,
+  body.intro .br,
+  body.intro .cta-wrap{
+    opacity:0;
   }
-  @media (prefers-reduced-motion:reduce){
-    .cta-wrap{animation:none}
-    .cta{transition:none}
+  .stage picture, .corner, .br, .cta-wrap{
+    transition:opacity 1s ease;
   }
+  body.reveal .corner.tl{transition-delay:.25s}
+  body.reveal .corner.bl{transition-delay:.4s}
+  body.reveal .br{transition-delay:.55s}
+  body.reveal .cta-wrap{transition-delay:.7s}
+  body.reveal .stage picture,
+  body.reveal .corner,
+  body.reveal .br,
+  body.reveal .cta-wrap{opacity:1}
+
+  /* rise of cta on reveal */
+  body.intro .cta-wrap{transform:translate(-50%,calc(-50% + 18px))}
+  .cta-wrap{transition:opacity 1s ease,transform 1s cubic-bezier(.2,.7,.2,1)}
+
+  canvas#fx{
+    position:absolute;
+    inset:0;
+    z-index:5;
+    pointer-events:none;
+  }
+
   @media (max-width:700px){
     .corner{font-size:clamp(1.6rem,8vw,2.2rem)}
     .cta-wrap{top:auto;bottom:26%;transform:translateX(-50%)}
-    @keyframes rise{
-      from{opacity:0;transform:translate(-50%,14px)}
-      to{opacity:1;transform:translate(-50%,0)}
-    }
+    body.intro .cta-wrap{transform:translate(-50%,18px)}
     .br{right:50%;transform:translateX(50%);text-align:center;bottom:1.2rem;font-size:.8rem}
     .bl{bottom:5.2rem}
+  }
+  @media (prefers-reduced-motion:reduce){
+    canvas#fx{display:none}
+    .stage picture,.corner,.br,.cta-wrap{transition:none;opacity:1 !important}
+    body.intro .cta-wrap{transform:translate(-50%,-50%)}
   }
 </style>
 </head>
@@ -124,11 +150,10 @@
     <source media="(max-width:700px)" srcset="bg-mobile.webp">
     <source media="(max-width:1400px)" srcset="bg-1600.webp">
     <source type="image/webp" srcset="bg-2560.webp">
-    <img class="bg" src="bg-2560.jpg" alt="" fetchpriority="high">
+    <img class="bg" id="bgimg" src="bg-2560.jpg" alt="" fetchpriority="high">
   </picture>
 
   <h1 class="corner tl"><span class="g">Visual</span><br><span class="w">Agency</span></h1>
-
   <p class="corner bl"><span class="g">Product</span><br><span class="w">Design</span></p>
 
   <div class="cta-wrap">
@@ -137,6 +162,190 @@
   </div>
 
   <p class="br">Coast Team Studio<br>2026. Georgia. Tbilisi</p>
+
+  <canvas id="fx"></canvas>
 </main>
+
+<script>
+(function(){
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(reduced) return; // content already visible, no canvas
+
+  document.body.classList.add('intro');
+
+  var canvas = document.getElementById('fx');
+  var ctx = canvas.getContext('2d');
+  var DPR = Math.min(window.devicePixelRatio || 1, 2);
+  var W, H, CX, CY, R;
+
+  function size(){
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+    ctx.setTransform(DPR,0,0,DPR,0,0);
+    CX = W/2; CY = H/2;
+    R = Math.min(W,H) * 0.24;
+  }
+  size();
+  window.addEventListener('resize', size);
+
+  var isMobile = Math.min(W,H) < 700;
+  var N = isMobile ? 320 : 620;
+
+  // colors: brand mint / white / deep green
+  var palette = ['#ffffff','#ffffff','#f2f8f4','#a9cbb9','#7ba392','#46695c'];
+
+  // fibonacci sphere + per-particle params
+  var pts = [];
+  var GA = Math.PI * (3 - Math.sqrt(5));
+  for(var i=0;i<N;i++){
+    var y = 1 - (i / (N-1)) * 2;
+    var rad = Math.sqrt(1 - y*y);
+    var th = GA * i;
+    var x = Math.cos(th)*rad, z = Math.sin(th)*rad;
+    pts.push({
+      x:x, y:y, z:z,
+      // scatter start (converge phase): random point far outside
+      sx: CX + (Math.random()-0.5) * W * 1.6,
+      sy: CY + (Math.random()-0.5) * H * 1.6,
+      col: palette[(Math.random()*palette.length)|0],
+      sz: 1.2 + Math.random()*2.2,
+      // burst params
+      burstSpeed: 0.9 + Math.random()*0.9,
+      swirl: (Math.random()-0.5) * 2.2,
+      delay: Math.random()*0.12
+    });
+  }
+
+  // timeline (seconds)
+  var T_CONVERGE = 0.75;
+  var T_SPIN_MIN = 0.9;     // minimum spin time; extends until bg image ready
+  var T_BURST = 1.05;
+
+  var bgReady = false;
+  var img = document.getElementById('bgimg');
+  function markReady(){ bgReady = true; }
+  if(img.complete && img.naturalWidth) markReady();
+  else { img.addEventListener('load', markReady); img.addEventListener('error', markReady); }
+  // hard cap: never wait more than 4s for the image
+  setTimeout(markReady, 4000);
+
+  var start = performance.now();
+  var burstAt = null;      // timestamp when burst began
+  var revealed = false;
+  var skipped = false;
+
+  // tap/click to skip
+  function skip(){ if(!burstAt){ burstAt = performance.now(); } skipped = true; }
+  window.addEventListener('pointerdown', skip, {once:true});
+
+  function easeOutCubic(t){ return 1 - Math.pow(1-t,3); }
+  function easeInOut(t){ return t<.5 ? 2*t*t : 1 - Math.pow(-2*t+2,2)/2; }
+
+  var rotY = 0, rotX = 0;
+
+  function frame(now){
+    var t = (now - start) / 1000;
+    ctx.clearRect(0,0,W,H);
+
+    // phase resolution
+    var phase, pt; // pt = progress within phase
+    if(t < T_CONVERGE){ phase = 0; pt = t / T_CONVERGE; }
+    else if(!burstAt){
+      phase = 1;
+      var spinT = t - T_CONVERGE;
+      // start burst when min spin passed AND image ready
+      if(spinT >= T_SPIN_MIN && bgReady){ burstAt = now; }
+      pt = spinT;
+    }
+    if(burstAt){
+      phase = 2;
+      pt = (now - burstAt) / 1000 / T_BURST;
+    }
+
+    // reveal content shortly after burst starts
+    if(phase === 2 && !revealed && pt > 0.18){
+      revealed = true;
+      document.body.classList.add('reveal');
+      document.body.classList.remove('intro');
+    }
+
+    // rotation advances through all phases
+    rotY += 0.014 + (phase===2 ? 0.01 : 0);
+    rotX = Math.sin(t*0.7) * 0.25;
+
+    var cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+    var cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+
+    var done = true;
+
+    for(var i=0;i<N;i++){
+      var p = pts[i];
+      // rotate sphere point
+      var x = p.x*cosY - p.z*sinY;
+      var z = p.x*sinY + p.z*cosY;
+      var y = p.y*cosX - z*sinX;
+      z = p.y*sinX + z*cosX;
+
+      // perspective
+      var persp = 1.6 / (1.6 + z);
+      var sphX = CX + x * R * persp;
+      var sphY = CY + y * R * persp;
+      var depth = (z + 1) / 2; // 0 far, 1 near
+
+      var px, py, alpha, sizeMul;
+
+      if(phase === 0){
+        var e = easeOutCubic(pt);
+        px = p.sx + (sphX - p.sx) * e;
+        py = p.sy + (sphY - p.sy) * e;
+        alpha = 0.15 + 0.85 * e;
+        sizeMul = 1;
+        done = false;
+      } else if(phase === 1){
+        px = sphX; py = sphY;
+        alpha = 1;
+        sizeMul = 1 + Math.sin(t*3 + i)*0.12; // breathing
+        done = false;
+      } else {
+        var bp = Math.min(Math.max((pt - p.delay) / (1 - p.delay), 0), 1);
+        var e2 = easeInOut(bp);
+        // radial direction from center + swirl tangent
+        var dx = sphX - CX, dy = sphY - CY;
+        var len = Math.sqrt(dx*dx + dy*dy) || 1;
+        var nx = dx/len, ny = dy/len;
+        var tx = -ny, ty = nx; // tangent
+        var dist = e2 * Math.max(W,H) * 0.75 * p.burstSpeed;
+        var swirlAmt = Math.sin(e2 * Math.PI) * 90 * p.swirl;
+        px = sphX + nx * dist + tx * swirlAmt;
+        py = sphY + ny * dist + ty * swirlAmt;
+        alpha = 1 - e2;
+        sizeMul = 1 + e2 * 1.5;
+        if(bp < 1) done = false;
+      }
+
+      if(alpha <= 0.01) continue;
+      ctx.globalAlpha = alpha * (0.35 + 0.65*depth);
+      ctx.fillStyle = p.col;
+      var s = p.sz * (0.5 + depth) * sizeMul;
+      ctx.beginPath();
+      ctx.arc(px, py, s, 0, 6.2832);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    if(phase === 2 && done){
+      canvas.remove();
+      if(!revealed){
+        document.body.classList.add('reveal');
+        document.body.classList.remove('intro');
+      }
+      return;
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
 </body>
 </html>
